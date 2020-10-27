@@ -69,14 +69,15 @@ class DataDownloader():
          ("o", "i1"), ("p", "i1"),
          ("q", "i1"), ("r", "i1"),
          ("s", "i1"), ("t", "i1"),
-         ("p5a", "i1")])
+         ("p5a", "i1"), ("region", "U3")])
         self.region_cache = {}
     
     def download_data(self):
         html_page = self._request_html_page()
         hrefs = self._get_zip_hrefs(html_page)
-        urls, paths = self._get_urls_and_paths(hrefs)
-        for url, path in zip(urls, paths):
+        urls_and_paths= self._get_urls_and_paths(hrefs)
+        
+        for url, path in urls_and_paths:
             self._download_file(url, path)
         
     def _request_html_page(self):
@@ -109,11 +110,62 @@ class DataDownloader():
         return valid_hrefs
     
     def _get_urls_and_paths(self, hrefs):
-        for href in hrefs:
+        filtered_hrefs = self._get_latest_paths_for_each_year(hrefs)
+        
+        for href in filtered_hrefs:
             file_name = Path(href).name
             file_url = urllib.parse.urljoin(self.url, href)
             file_path = os.path.join(self.folder, file_name)
             yield file_url, file_path
+        
+    def _get_latest_paths_for_each_year(self, file_paths):
+        file_names = np.array([Path(path).name for path in file_paths])
+        grouped_files = self._group_files_by_year(file_names, file_paths)
+       
+        latest_paths = []
+        for file_names, file_paths, year in grouped_files:
+            latest_path = self._get_latest_path_in_year(file_names, file_paths, year)
+            if not latest_path is None:
+                latest_paths.append(latest_path)
+        return latest_paths
+                
+    def _group_files_by_year(self, file_names, file_paths):
+        file_paths = np.array(file_paths)
+        years = np.zeros(shape=(len(file_paths)), dtype=int)
+        year_regex = re.compile(".*(\d{4})\.zip")
+        
+        for i, file_name in enumerate(file_names):
+            match = year_regex.match(file_name)
+            if match:
+                years[i] = match.group(1)
+        
+        years_unique, years_indices = np.unique(years, return_inverse=True)
+        
+        for i, year in enumerate(years_unique):
+            if year == 0:
+                continue
+            
+            year_indices = np.squeeze(np.argwhere(years_indices == i))
+            year_file_names = file_names[year_indices].flatten()
+            year_file_paths = file_paths[year_indices].flatten()
+            yield year_file_names, year_file_paths, year
+
+    def _get_latest_path_in_year(self, file_names, file_paths, year):
+        latest_month = 0
+        latest_file_path = None
+        
+        month_regex = re.compile(fr".*(\d\d)-{year}\.zip")
+        for i, file_name in enumerate(file_names):
+            match = month_regex.match(file_name)
+            
+            if not match:
+                return file_paths[i]
+            
+            matched_month = int(match.group(1))
+            if matched_month > latest_month:
+                latest_month = matched_month
+                latest_file_path = file_paths[i]
+        return latest_file_path
             
     def _download_file(self, source_url, save_file_path):
         request = requests.get(source_url, stream=True)
@@ -121,33 +173,33 @@ class DataDownloader():
             for chunk in request.iter_content(chunk_size=128):
                 fd.write(chunk)
     
-    def _get_data_file_paths(self, ):
-        return glob.glob(os.path.join(self.folder, "*.zip"))
-        
     def parse_region_data(self, region):
-        filename = self._convert_region_to_filename(region)
-        #self._download_files_if_not_exist()
+        filename = self._try_convert_region_to_filename(region)
+        self._download_files_if_not_exist()
         file_paths = self._get_data_file_paths()
+        file_paths = self._get_latest_paths_for_each_year(file_paths)
         
         features = None
-        
         for file_path in file_paths:
-            archive = zipfile.ZipFile(file_paths[0], 'r')
+            archive = zipfile.ZipFile(file_path, 'r')
             with archive.open(filename, "r") as region_file:
-                file_features = self._parse_refion_data_from_file(region_file)
+                file_features = self._parse_region_data_from_file(region_file)
+                file_features[-1][...] = region
             features = self._concatenate_features(features, file_features)
             
-        print(features[0].shape)
         return self.headers[...,0], features 
     
-    def _parse_refion_data_from_file(self, file):
+    def _get_data_file_paths(self):
+        return glob.glob(os.path.join(self.folder, "*.zip"))
+        
+    def _parse_region_data_from_file(self, file):
         lines_count = self._file_lines_count(file)
         file_features = [np.empty(shape=(lines_count), dtype=header[1])
                          for header in self.headers]
-        reader = csv.reader(io.TextIOWrapper(file, "ISO-8859-1"), delimiter=';', quotechar='|')
+        reader = csv.reader(io.TextIOWrapper(file, "ISO-8859-1"), delimiter=';', quotechar='"')
 
         for row_index, row in enumerate(reader):
-            for i in range(len(self.headers)):
+            for i in range(len(self.headers) - 1):
                 try:
                     file_features[i][row_index] = row[i]
                 except ValueError:
@@ -163,9 +215,9 @@ class DataDownloader():
     def _download_files_if_not_exist(self):
         html_page = self._request_html_page()
         hrefs = self._get_zip_hrefs(html_page)
-        urls, paths = self._get_urls_and_paths(hrefs)
+        urls_and_paths = self._get_urls_and_paths(hrefs)
         
-        for url, path in zip(urls, paths):
+        for url, path in urls_and_paths:
             if not os.path.isfile(path):
                 self._download_file(url, path)
     
@@ -248,7 +300,8 @@ class DataDownloader():
 
 if __name__ == "__main__":
     downloader = DataDownloader()
-    h, f = downloader.get_list(["OLK", "VYS", "HKK"])
+    #h, f = downloader.get_list(["OLK", "VYS", "HKK"])
+    h, f = downloader.parse_region_data("OLK")
     print(h.shape, f[0].shape)
     
     
