@@ -15,6 +15,7 @@ import glob
 import gzip, pickle, csv, zipfile
 from bs4 import BeautifulSoup
 from pathlib import Path
+import time
 
 
 class DataDownloader():
@@ -24,8 +25,14 @@ class DataDownloader():
         if url == "":
             raise ValueError("Url cannot be empty.")
             
+        if not re.fullmatch(r"[^{}/\\]*\{\}[^{}/\\]*", cache_filename):
+            raise ValueError("Invalid cache_filename parameter: " +
+                             "It must contain a single pair of formatting braces {} "+
+                             "and no slashes.")
+            
         if not cache_filename.endswith(".pkl.gz"):
-            raise ValueError("The only supported file type is .pkl.gz - pickle and gzip.")
+            raise ValueError("Invalid cache_filename parameter: " +
+                             "The only supported file type is .pkl.gz - pickle and gzip.")
             
         if not os.path.exists(folder):
             os.makedirs(folder)
@@ -196,7 +203,7 @@ class DataDownloader():
         lines_count = self._file_lines_count(file)
         file_features = [np.empty(shape=(lines_count), dtype=header[1])
                          for header in self.headers]
-        reader = csv.reader(io.TextIOWrapper(file, "ISO-8859-1"), delimiter=';', quotechar='"')
+        reader = csv.reader(io.TextIOWrapper(file, "Windows-1250"), delimiter=';', quotechar='"')
 
         for row_index, row in enumerate(reader):
             for i in range(len(self.headers) - 1):
@@ -300,9 +307,14 @@ class DataDownloader():
 
 if __name__ == "__main__":
     downloader = DataDownloader()
+    start = time.time()
+    downloader.get_list(["OLK"])
+    end = time.time()
+    print(end - start)
+
     #h, f = downloader.get_list(["OLK", "VYS", "HKK"])
-    h, f = downloader.parse_region_data("OLK")
-    print(h.shape, f[0].shape)
+    #h, f = downloader.parse_region_data("OLK")
+    #print(h.shape, f[0].shape)
     
     
     
