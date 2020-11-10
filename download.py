@@ -217,7 +217,7 @@ class DataDownloader():
             for chunk in request.iter_content(chunk_size=128):
                 fd.write(chunk)
     
-    def parse_region_data(self, region):
+    def parse_region_data(self, region, check_for_updates=True):
         """
         Given a region name, it parses information about the region 
         from zip files in self.folder. If a file is missing, it is downloaded.
@@ -226,6 +226,8 @@ class DataDownloader():
         ----------
         region : string
             A three-character abbreviation of a region.
+        check_for_updates : bool
+            A flag indicating whether it should check for new files or missing ones.
 
         Returns
         -------
@@ -234,7 +236,8 @@ class DataDownloader():
 
         """
         filename = self._try_convert_region_to_filename(region)
-        self._download_files_if_not_exist()
+        if check_for_updates:
+            self._download_files_if_not_exist()
         file_paths = self._get_data_file_paths()
         file_paths = self._get_latest_paths_for_each_year(file_paths)
         
@@ -365,7 +368,7 @@ class DataDownloader():
                 features = self._concatenate_features(features, region_features)
                 continue
             
-            _, region_features = self.parse_region_data(region)
+            _, region_features = self.parse_region_data(region, check_for_updates=False)
             self._save_region_data_to_variable(region, region_features)
             self._save_region_data_to_file(region, region_features)
             features = self._concatenate_features(features, region_features)
