@@ -1,8 +1,11 @@
 """
 Created on Tue Oct 20 21:21:19 2020
 
-@author: Ladislav Ondris (xondri07)
-         ladislav.ondris.1@gmail.com
+@author: Ladislav Ondris
+         xondri07@vutbr.cz
+         
+DataDownloader aquires PCR dataset either from web source, 
+or from local cache.
 """
 
 import numpy as np
@@ -14,8 +17,7 @@ import io
 import glob
 import gzip, pickle, csv, zipfile
 from bs4 import BeautifulSoup
-from pathlib import Path
-import time
+from pathlib import Path 
 
 
 class DataDownloader():
@@ -25,11 +27,13 @@ class DataDownloader():
         if url == "":
             raise ValueError("Url cannot be empty.")
             
+        # Check whether the cache_filename is valid
         if not re.fullmatch(r"[^{}/\\]*\{\}[^{}/\\]*", cache_filename):
             raise ValueError("Invalid cache_filename parameter: " +
                              "It must contain a single pair of formatting braces {} "+
                              "and no slashes.")
             
+        # Cache_filename supports only .pkl.gz
         if not cache_filename.endswith(".pkl.gz"):
             raise ValueError("Invalid cache_filename parameter: " +
                              "The only supported file type is .pkl.gz - pickle and gzip.")
@@ -42,44 +46,77 @@ class DataDownloader():
         self.cache_filename = cache_filename
         self.regions = ["PHA","STC","JHC","PLK","ULK","HKK","JHM",
                         "MSK","OLK","ZLK","VYS","PAK","LBK","KVK",]
-        
         self.headers = np.array([
-         ("p1", "<U12"), ("p36", "i1"), 
-         ("p37", "i1"), ("p2a", "<U10"),
-         ("weekday(p2a)", "i1"), ("p2b", "<U4"),
-         ("p6", "i1"), ("p7", "i1"),
-         ("p8", "i1"), ("p9", "i1"),
-         ("p10", "i1"), ("p11", "i1"),
-         ("p12", "i2"), ("p13a", "i1"),
-         ("p13b", "i1"), ("p13c", "i1"),
-         ("p14", "i8"), ("p15", "i1"),
-         ("p16", "i1"), ("p17", "i1"),
-         ("p18", "i1"), ("p19", "i1"),
-         ("p20", "i1"), ("p21", "i1"),
-         ("p22", "i1"), ("p23", "i1"),
-         ("p24", "i1"), ("p27", "i1"),
-         ("p28", "i1"), ("p34", "i2"),
-         ("p35", "i1"), ("p39", "i1"),
-         ("p44", "i1"), ("p45a", "i1"),
-         ("p47", "i1"), ("p48a", "i1"),
-         ("p49", "i1"), ("p50a", "i1"),
-         ("p50b", "i1"), ("p51", "i1"),
-         ("p52", "i1"), ("p53", "i1"),
-         ("p55a", "i1"), ("p57", "i1"),
+         ("p1", "i8"), # ID
+         ("p36", "i1"), # Druh pozemní komunikace 0-8 
+         ("p37", "i4"), # Cislo pozemni komunikace 0-999999
+         ("p2a", "datetime64[D]"), # Datum
+         ("weekday(p2a)", "i1"), 
+         ("p2b", "U4"), # Cas
+         ("p6", "i1"), # Druh nehody 0-9
+         ("p7", "i1"), # Druh srazky jedoucich vozidel 0-4
+         ("p8", "i1"), # Druh pevne prekazky 0-9
+         ("p9", "i1"), # Charakter nehody 1-2
+         ("p10", "i1"), # 0-7
+         ("p11", "i1"), # 0-9
+         ("p12", "i2"), # 100-615
+         ("p13a", "i1"), # usmrceno
+         ("p13b", "i1"), # tezce zraneno
+         ("p13c", "i1"), # lehce zraneno
+         ("p14", "i4"), # hmotna skoda
+         ("p15", "i1"), #
+         ("p16", "i1"), #
+         ("p17", "i1"), #
+         ("p18", "i1"), #
+         ("p19", "i1"), #
+         ("p20", "i1"), #
+         ("p21", "i1"), #
+         ("p22", "i1"), #
+         ("p23", "i1"), #
+         ("p24", "i1"), 
+         ("p27", "i1"),
+         ("p28", "i1"), 
+         ("p34", "i2"),
+         ("p35", "i1"), 
+         ("p39", "i1"),
+         ("p44", "i1"), 
+         ("p45a", "i1"),
+         ("p47", "i1"), 
+         ("p48a", "i1"),
+         ("p49", "i1"), 
+         ("p50a", "i1"),
+         ("p50b", "i1"),
+         ("p51", "i1"),
+         ("p52", "i1"), 
+         ("p53", "i4"),
+         ("p55a", "i1"), 
+         ("p57", "i1"),
          ("p58", "i1"),
-         ("a", "i1"), ("b", "i1"),
-         ("d", "i1"), ("e", "f8"),
-         ("f", "f8"), ("g", "i1"),
-         ("h", "i1"), ("i", "i1"),
-         ("j", "i1"), ("k", "i1"),
-         ("l", "i1"), ("n", "i1"),
-         ("o", "i1"), ("p", "i1"),
-         ("q", "i1"), ("r", "i1"),
-         ("s", "i1"), ("t", "i1"),
-         ("p5a", "i1"), ("region", "U3")])
+         ("a", "f8"), ("b", "f8"),
+         ("d", "f8"), ("e", "f8"), # Souradnice
+         ("f", "f8"), 
+         ("g", "f8"),
+         ("h", "U50"), 
+         ("i", "U16"),
+         ("j", "U16"), 
+         ("k", "U16"), # Typ silnice - dalnice, 1. tridy,...
+         ("l", "U8"), # ID silnice
+         ("n", "i4"),
+         ("o", "f8"), 
+         ("p", "U22"), # Opačnýkesměruúseku, Souhlasnýsesměremúseku
+         ("q", "U17"), # 'Odbočovacívpravo' 'Pomalý' 'Připojovacívpravo' 'Rychlý'
+         ("r", "i4"),
+         ("s", "i4"), 
+         ("t", "U32"), # 'GN_V0.1UIR-ADR_410' 'SN_20050929UIR-ADR_410' 'ULS_20050701UIR-ADR_410'
+         ("p5a", "i1"), 
+         ("region", "U3")])
         self.region_cache = {}
     
     def download_data(self):
+        """
+        Requests the page, finds all available zips 
+        and downloads only the relevant ones into self.folder.
+        """
         html_page = self._request_html_page()
         hrefs = self._get_zip_hrefs(html_page)
         urls_and_paths= self._get_urls_and_paths(hrefs)
@@ -181,6 +218,21 @@ class DataDownloader():
                 fd.write(chunk)
     
     def parse_region_data(self, region):
+        """
+        Given a region name, it parses information about the region 
+        from zip files in self.folder. If a file is missing, it is downloaded.
+
+        Parameters
+        ----------
+        region : string
+            A three-character abbreviation of a region.
+
+        Returns
+        -------
+        2-D Tuple
+            Returns a tuple containing header names and a list of numpy arrays.
+
+        """
         filename = self._try_convert_region_to_filename(region)
         self._download_files_if_not_exist()
         file_paths = self._get_data_file_paths()
@@ -193,7 +245,7 @@ class DataDownloader():
                 file_features = self._parse_region_data_from_file(region_file)
                 file_features[-1][...] = region
             features = self._concatenate_features(features, file_features)
-            
+        
         return self.headers[...,0], features 
     
     def _get_data_file_paths(self):
@@ -201,16 +253,20 @@ class DataDownloader():
         
     def _parse_region_data_from_file(self, file):
         lines_count = self._file_lines_count(file)
-        file_features = [np.empty(shape=(lines_count), dtype=header[1])
-                         for header in self.headers]
+        file_features = self._create_empty_arrays(lines_count)
         reader = csv.reader(io.TextIOWrapper(file, "Windows-1250"), delimiter=';', quotechar='"')
 
         for row_index, row in enumerate(reader):
-            for i in range(len(self.headers) - 1):
+            feature_col = 0
+            for i in range(len(row)): # For each column
+                if self.headers[i][1] == "f8":
+                    row[i] = row[i].replace(',', '.')
                 try:
-                    file_features[i][row_index] = row[i]
+                    file_features[feature_col][row_index] = row[i]
                 except ValueError:
-                    file_features[i][row_index] = -1
+                    pass
+                feature_col += 1
+            
         return file_features
       
     def _file_lines_count(self, file):
@@ -218,15 +274,29 @@ class DataDownloader():
             pass
         file.seek(0)
         return i
-        
+    
+    def _create_empty_arrays(self, lines_count):
+        file_features = []
+        for header_name, header_type in self.headers:
+            if header_type == "f8":
+                fill_value = np.nan
+            else:
+                fill_value = -1
+            ndarray = np.full(shape=(lines_count), fill_value=fill_value, dtype=header_type)
+            file_features.append(ndarray)
+        return file_features
+    
     def _download_files_if_not_exist(self):
         html_page = self._request_html_page()
         hrefs = self._get_zip_hrefs(html_page)
         urls_and_paths = self._get_urls_and_paths(hrefs)
         
+        downloaded_count = 0
         for url, path in urls_and_paths:
             if not os.path.isfile(path):
                 self._download_file(url, path)
+                downloaded_count += 1
+        return downloaded_count
     
     def _try_convert_region_to_filename(self, region):
         try:
@@ -248,9 +318,36 @@ class DataDownloader():
         return features1
     
     def get_list(self, regions = None):
+        """
+        Returns information about accidents for specified regions. 
+        First, it tries to find the information in a cache variable, then in a directory from files,
+        and lastly, it calls parse_region_data to retrieve the information for a particular
+        region.
+        
+
+        Parameters
+        ----------
+        regions : list of strings, optional
+            The list of regions to retrieve information about.
+            The default is None. If None, all regions are selected.
+
+        Raises
+        ------
+        ValueError
+            Raises ValueError if an unknown region is requested..
+
+        Returns
+        -------
+        2-D Tuple
+            Returns a tuple containing header names and a list of numpy arrays.
+        """
         if regions is None:
             regions = self.regions
             
+        downloaded = self._download_files_if_not_exist()
+        if downloaded > 0: # if a new file is downloaded, delete all cache
+            self._clear_cache()
+        
         features = None
         
         for region in regions:
@@ -274,6 +371,13 @@ class DataDownloader():
             features = self._concatenate_features(features, region_features)
             
         return self.headers[...,0], features
+    
+    def _clear_cache(self):
+        self.region_cache.clear()
+        files = glob.glob(os.path.join(self.folder, self.cache_filename.format('*')))
+        for local_file_cache in files:
+            os.remove(local_file_cache)
+        
     
     def _get_region_data_from_variable(self, region):
         if region in self.region_cache:
@@ -303,18 +407,31 @@ class DataDownloader():
         
         with open(file_path, "wb") as f:
             f.write(compressed)
-    
+
+def print_unique(ar):
+    u = np.sort(np.unique(ar))
+    print("Unique:", u.shape, u)
 
 if __name__ == "__main__":
     downloader = DataDownloader()
+    h, f = downloader.get_list(["OLK", "VYS", "HKK"])
+    print("Regions:", np.unique(f[64]))
+    print("Number of records:", f[0].shape[0])
+    print("Headers count:", len(h))
+    print("Headers:", h)
+    
+    # Use the following lines to measure the time taken by calling the get_list method
+    """
     start = time.time()
     downloader.get_list(["OLK"])
     end = time.time()
     print(end - start)
-
-    #h, f = downloader.get_list(["OLK", "VYS", "HKK"])
-    #h, f = downloader.parse_region_data("OLK")
-    #print(h.shape, f[0].shape)
+    """
+    
+    # Use the following lines to print unique values in the column
+    #h, f = downloader.parse_region_data("ULK")
+    #header_index = np.argwhere(downloader.headers[...,0] == "region").flatten()[0]
+    #print_unique(f[header_index])
     
     
     

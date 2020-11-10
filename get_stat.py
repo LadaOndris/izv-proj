@@ -1,5 +1,13 @@
+"""
+
+@author: Ladislav Ondris
+         xondri07@vutbr.cz
+         
+This file plots data from PCR dataset.
+"""
 
 import numpy as np
+import argparse
 import matplotlib.pyplot as plt
 from download import DataDownloader
 
@@ -9,16 +17,33 @@ def label_bars(ax, rects):
         height = rect.get_height()
         ax.annotate('{}'.format(height),
                     xy=(rect.get_x() + rect.get_width() / 2, height),
-                    xytext=(0, -15),  # 3 points vertical offset
+                    xytext=(0, -13),
                     textcoords="offset points",
                     ha='center', va='bottom', color='white')
 
 
 
 def plot_stat(data_source, fig_location = None, show_figure = False):
+    """
+    Given a data_source of parsed PCR dataset, it produces 
+    a bar plot using matplotlib displaying the number of accidents in 
+    each reagion. It creates a subplot for each year.
+
+    Parameters
+    ----------
+    data_source :
+        The data source.
+    fig_location : string, optional
+        File path to save the figure to. If it None, it is not saved.
+    show_figure : boolean, optional
+        Shows the figure in a console if True.
+
+    Returns
+    -------
+    None.
+
+    """
     headers, features = data_source
-    index = np.squeeze(np.argwhere(headers == "region"))
-    
     regions_col = _get_regions_col(headers, features)
     years_col = _get_years_col(headers, features)
     
@@ -27,39 +52,30 @@ def plot_stat(data_source, fig_location = None, show_figure = False):
     
     fig, ax_list = plt.subplots(nrows=len(unique_years), ncols=1, 
                                 figsize=(0.6*len(unique_regions), 2.5*len(unique_years)),
-                                constrained_layout=True)
+                                sharey=True)
     
     counts = _get_counts_for_each_year_and_region(regions_col, unique_years, year_indices)
-    maximal_count = _get_maximal_count(counts)
     
     for i, (year, regions_counts) in enumerate(counts):
-        
         indexofsort_ascending = np.argsort(regions_counts[:,1].astype(int),axis=-1)
         indexofsort_descending = np.flip(indexofsort_ascending, axis=0)
         regions_counts = regions_counts[indexofsort_descending,:]
         
-        
         ax = ax_list[i]
         bars = ax.bar(regions_counts[:,0], regions_counts[:,1].astype(int), width=0.97)
-        ax.set_title(year, fontsize=16)
-        #ax.get_xaxis().set_visible(False)
-        ax.set_ylim([0, maximal_count])
+        ax.set_title(year, fontsize=16, y=0.83)
         ax.tick_params(axis="x", bottom=False)
         ax.tick_params(axis="y", left=False)
         ax.grid(axis="y", which="major", color="black", alpha=.2, linewidth=.5)
         ax.set_ylabel("Počet nehod", fontsize=14)
-        ax.margins(y=1, tight=False)
-        #ax_list[i].text()
         
         for pos in ['right','top','bottom','left']:
             ax.spines[pos].set_visible(False)
-        
         label_bars(ax, bars)
+        
+    fig.tight_layout(pad=2)
+    fig.suptitle("Počty nehod v českých krajích", fontsize=16, y=1)
     
-    #fig.subplots_adjust(top=0.95, bottom=0)
-    #fig.tight_layout(pad=2)
-    fig.suptitle("Počty nehod v českých krajích v minulých letech", fontsize=16, y=0.98)
- 
     if fig_location:
         fig.savefig(fig_location)
     if show_figure:
@@ -70,9 +86,7 @@ def _get_regions_col(headers, features):
 
 def _get_years_col(headers, features):
     dates_col = features[np.squeeze(np.argwhere(headers == "p2a"))]
-    dates_col = np.char.split(dates_col, '-')
-    dates_col = np.array([np.array(year) for year in dates_col])
-    return dates_col[...,0]
+    return dates_col.astype("datetime64[Y]")
 
 def _get_counts_for_each_year_and_region(regions_col, unique_years, year_indices):
     counts = []
@@ -80,23 +94,17 @@ def _get_counts_for_each_year_and_region(regions_col, unique_years, year_indices
         regions_for_the_year = regions_col[np.argwhere(year_indices == i)]
         region_labels, region_counts = np.unique(regions_for_the_year, return_counts=True)
         regions_counts = np.stack([region_labels, region_counts], axis=1)
-        
-        #print(regions_counts)
-        #regions_counts = np.array(regions_counts, dtype=[('region', 'U3'), ('count', 'i4')])
         counts.append([year, regions_counts])
-        
     return counts
 
-def _get_maximal_count(counts):
-    max_count = 0
-    for year, regions_counts in counts:
-        m = np.max(regions_counts[:,1].astype('int'))
-        max_count = max(max_count, m)
-    return max_count
-    
 if __name__ == "__main__":
-    #data_source = DataDownloader().get_list(["OLK", "PAK", "JHM", "HKK"])
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--fig_location', help='Path to the figure including its name', type=str)
+    parser.add_argument('--show_figure', help='Show figure in console', action='store_true', 
+                        default=False)
+    args = parser.parse_args()
+    
     data_source = DataDownloader().get_list()
-    plot_stat(data_source, show_figure=True, fig_location="fig.png")
+    plot_stat(data_source, show_figure=args.show_figure, fig_location=args.fig_location)
     
     
