@@ -249,7 +249,7 @@ class DataDownloader():
                 file_features[-1][...] = region
             features = self._concatenate_features(features, file_features)
         
-        return self.headers[...,0], features 
+        return self.headers[...,0].tolist(), features 
     
     def _get_data_file_paths(self):
         return glob.glob(os.path.join(self.folder, "*.zip"))
@@ -373,7 +373,7 @@ class DataDownloader():
             self._save_region_data_to_file(region, region_features)
             features = self._concatenate_features(features, region_features)
             
-        return self.headers[...,0], features
+        return self.headers[...,0].tolist(), features
     
     def _clear_cache(self):
         self.region_cache.clear()
