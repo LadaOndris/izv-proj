@@ -82,10 +82,10 @@ def plot_stat(data_source, fig_location = None, show_figure = False):
         fig.show()
         
 def _get_regions_col(headers, features):
-    return features[np.squeeze(np.argwhere(headers == "region"))]
+    return features[headers.index("region")]
 
 def _get_years_col(headers, features):
-    dates_col = features[np.squeeze(np.argwhere(headers == "p2a"))]
+    dates_col = features[headers.index("p2a")]
     return dates_col.astype("datetime64[Y]")
 
 def _get_counts_for_each_year_and_region(regions_col, unique_years, year_indices):
