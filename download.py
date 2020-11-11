@@ -249,7 +249,7 @@ class DataDownloader:
             Returns a tuple containing header names and a list of numpy arrays.
 
         """
-        filename = self._try_convert_region_to_filename(region)
+        file_name = self._try_convert_region_to_filename(region)
         if check_for_updates:
             self._download_files_if_not_exist()
         file_paths = self._get_data_file_paths()
@@ -257,41 +257,41 @@ class DataDownloader:
 
         features = None
         for file_path in file_paths:
-            archive = zipfile.ZipFile(file_path, 'r')
-            with archive.open(filename, "r") as region_file:
-                file_features = self._parse_region_data_from_file(region_file)
-                file_features[-1][...] = region
+            file_features = self._parse_region_data_from_file(file_path, file_name)
+            file_features[-1][...] = region
             features = self._concatenate_features(features, file_features)
-
         return self.headers[..., 0].tolist(), features
 
     def _get_data_file_paths(self):
         return glob.glob(os.path.join(self.folder, "*.zip"))
 
-    def _parse_region_data_from_file(self, file):
-        lines_count = self._file_lines_count(file)
+    def _parse_region_data_from_file(self, file_path, file_name):
+        archive = zipfile.ZipFile(file_path, 'r')
+        lines_count = self._file_lines_count(archive, file_name)
         file_features = self._create_empty_arrays(lines_count)
-        io_wrapper = io.TextIOWrapper(file, "Windows-1250")
-        reader = csv.reader(io_wrapper, delimiter=';', quotechar='"')
 
-        for row_index, row in enumerate(reader):
-            feature_col = 0
-            for i in range(len(row)):  # For each column
-                if self.headers[i][1] == "f8":
-                    row[i] = row[i].replace(',', '.')
-                try:
-                    file_features[feature_col][row_index] = row[i]
-                except ValueError:
-                    pass
-                feature_col += 1
+        with archive.open(file_name, "r") as file:
+            io_wrapper = io.TextIOWrapper(file, "Windows-1250")
+            reader = csv.reader(io_wrapper, delimiter=';', quotechar='"')
 
-        return file_features
+            for row_index, row in enumerate(reader):
+                feature_col = 0
+                for i in range(len(row)):  # For each column
+                    if self.headers[i][1] == "f8":
+                        row[i] = row[i].replace(',', '.')
+                    try:
+                        file_features[feature_col][row_index] = row[i]
+                    except ValueError:
+                        pass
+                    feature_col += 1
+            return file_features
 
-    def _file_lines_count(self, file):
-        for i, l in enumerate(file, 1):
-            pass
-        file.seek(0)
-        return i
+    def _file_lines_count(self, archive, file_name):
+        with archive.open(file_name, "r") as file:
+            for i, l in enumerate(file, 1):
+                pass
+            return i
+        return 0
 
     def _create_empty_arrays(self, lines_count):
         """
