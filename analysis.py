@@ -49,8 +49,7 @@ def plot_conseq(df: pd.DataFrame, fig_location: str = None,
     grouped['counts'] = d['region'].value_counts()
     grouped = grouped.reset_index().sort_values(by='counts', ascending=False)
     rows_count = len(grouped.index)
-    pallete = sns.dark_palette("#69d", n_colors=rows_count)
-
+    color = '#2b2f35'
     fig, axes = plt.subplots(4, 1, figsize=(6, 9))
     for axis in axes:
         axis.tick_params(axis="x", bottom=False)
@@ -63,25 +62,25 @@ def plot_conseq(df: pd.DataFrame, fig_location: str = None,
     sns.set_style("darkgrid")
     title_y = 0.9
     g1 = sns.barplot(ax=axes[0], data=grouped, x='region', y='p13a',
-                     palette=pallete)
+                     color='#d92c26')
     g1.set_title('Úmrtí', y=title_y)
     g1.set_ylabel('Počet')
     g1.set_xlabel('')
 
     g2 = sns.barplot(ax=axes[1], data=grouped, x='region', y='p13b',
-                     palette=pallete)
+                     color='#b3504d')
     g2.set_title('Těžce zranění', y=title_y)
     g2.set_ylabel('Počet')
     g2.set_xlabel('')
 
     g3 = sns.barplot(ax=axes[2], data=grouped, x='region', y='p13c',
-                     palette=pallete)
+                     color='#996866')
     g3.set_title('Lehce zranění', y=title_y)
     g3.set_ylabel('Počet')
     g3.set_xlabel('')
 
     g4 = sns.barplot(ax=axes[3], data=grouped, x='region', y='counts',
-                     palette=pallete)
+                     color='#808080')
     g4.set_title('Celkem nehod', y=title_y)
     g4.set_ylabel('Počet')
     g4.set_xlabel('Kraj')
@@ -116,8 +115,12 @@ def plot_damage(df: pd.DataFrame, fig_location: str = None,
     g.set_ylabels('Počet')
     g.set_titles('{col_name}', size=16)
     g.fig.suptitle('Příčiny nehod v krajích', fontsize=18)
-    g._legend.set_title('Příčina nehody')
     g.tight_layout()
+    g.fig.subplots_adjust(bottom=0.16, right=0.98)
+    handles, labels = g.axes[0].get_legend_handles_labels()
+    g._legend.remove()
+    g.fig.legend(handles, labels, loc='lower center', bbox_to_anchor=(0.5, 0.02), ncol=3,
+                 title='Příčina nehody')
     g.fig.show()
 
 
@@ -153,10 +156,14 @@ def plot_surface(df: pd.DataFrame, fig_location: str = None,
     g.set_ylabels('Počet nehod')
     g.set_titles('{col_name}', size=16)
     g.fig.suptitle('Stav vozovky při nehodách', fontsize=18)
-    #g.axes[2].legend(loc='lower center', bbox_to_anchor=(1, 1), ncol=2, title='Stav vozovky')
-    g._legend.set_title('Příčina nehody')
     g.tight_layout()
+    g.fig.subplots_adjust(bottom=0.16, right=0.98)
+    handles, labels = g.axes[0].get_legend_handles_labels()
+    g._legend.remove()
+    g.fig.legend(handles, labels, loc='lower center', bbox_to_anchor=(0.5, 0.02), ncol=5,
+                 title='Stav vozovky')
     g.fig.show()
+
 
 if __name__ == "__main__":
     pass
