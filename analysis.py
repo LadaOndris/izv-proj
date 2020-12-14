@@ -110,19 +110,19 @@ def plot_damage(df: pd.DataFrame, fig_location: str = None,
     Plots the damage caused and the cause of accidents
     for selected regions.
     """
+    # Prepare data
     regions = ['JHC', 'HKK', 'OLK', 'PLK']
     columns = ['region', 'p53', 'p12']
     df_regions = df[df['region'].isin(regions)][columns]
-
     df_regions['p53'] = pd.cut(df_regions['p53'], [-np.inf, 500, 2000, 5000, 10000, np.inf],
                                labels=['<50', '50 - 200', '200 - 500', '500 - 1000', '>1000'])
     df_regions['p12'] = pd.cut(df_regions['p12'], [99, 199, 299, 399, 499, 599, 699],
                                labels=['Nezaviněná řidičem', 'Nepřiměřená rychlost jízdy',
                                        'Nesprávné předjíždění', 'Nedání přednosti v jízdě', 'Nesprávný způsob jízdy',
                                        'Technická závada vozidla'])
-
     df_regions = df_regions.groupby(columns, as_index=False).agg('size')
 
+    # Plot
     sns.set_style("whitegrid")
     g = sns.catplot(data=df_regions, x='p53', y='size', hue='p12', col='region',
                     col_wrap=2, kind='bar')
@@ -148,6 +148,7 @@ def plot_surface(df: pd.DataFrame, fig_location: str = None,
     Plots how often each of the surfaces were present
     when accidents happened.
     """
+    # Define selected regions, columns, and labels
     regions = ['JHC', 'HKK', 'OLK', 'PLK']
     columns = ['region', 'date', 'p16', 'p1']
     labels = ['jiný stav',
@@ -160,6 +161,8 @@ def plot_surface(df: pd.DataFrame, fig_location: str = None,
               'rozlitý olej, nafta apod.',
               'souvislý sníh',
               'náhlá změna stavu']
+
+    # Prepare data
     rename_map = {key: label for key, label in zip(range(0, len(labels)), labels)}
     df_regions = df[df['region'].isin(regions)][columns]
     df_regions = pd.crosstab([df_regions['region'], df_regions['date']], df_regions['p16'])
@@ -169,6 +172,7 @@ def plot_surface(df: pd.DataFrame, fig_location: str = None,
         ['region', 'p16', pd.Grouper(key='date', freq='M')]).sum()
     df_grouped = df_grouped.reset_index()
 
+    # Plot
     sns.set_style("whitegrid")
     g = sns.relplot(data=df_grouped, x='date', y=df_grouped[0], hue='p16', col='region',
                     col_wrap=2, kind='line')
